@@ -91,7 +91,7 @@ int fileOffset;
 
 //  while(!Serial);
 
-for (int i=0; i<16; i++) {pinMode(D_PIN[i], INPUT);} // SET DIR TO OUTPUT
+for (int i=0; i<16; i++) {pinMode(D_PIN[i], OUTPUT);} // SET DIR TO OUTPUT
 
 
   for (long i=0; i<65536; i++) {
@@ -160,20 +160,22 @@ void loop()
   unsigned int romOffset=0;
   unsigned int parallelBus,dataOut;
   bool deviceAddress = false;  
-  int counter=0;
   
   // Initialize the bus state variables
 
   lastBusState = BUS_NACT;
   dataOut=0;
   // Set the parallel port pins to defaults
+  for (int i=0; i<16; i++) {
+    pinMode(D_PIN[i], INPUT);
+    } // SET DIR TO INPUT
+
       digitalWriteFast(DIR_PIN,HIGH); // set dir to input from 5V INTV
-       //wait for lvc245 to stabilize
- 
-      for (int i=0; i<16; i++) {pinMode(D_PIN[i], INPUT);} // SET DIR TO INPUT
-     delayNanoseconds(250); 
+      //wait for lvc245 to stabilize
+      delayNanoseconds(800); 
+      
   // reading data
-       parallelBus=(digitalReadFast(D0_PIN)<<0 |
+       parallelBus=(digitalReadFast(D0_PIN) |
                     digitalReadFast(D1_PIN)<<1 |
                     digitalReadFast(D2_PIN)<<2 |
                     digitalReadFast(D3_PIN)<<3 |
@@ -208,7 +210,6 @@ void loop()
     } while ( busState1 == lastBusState);
 
     // We detected a change, but reread the bus state to make sure that all three pins have settled
-
     busState1 = (digitalReadFast(BDIR_PIN)<<2)|(digitalReadFast(BC2_PIN)<<1)|digitalReadFast(BC1_PIN);
     lastBusState=busState1;
     
@@ -255,14 +256,14 @@ void loop()
         digitalWriteFast(D13_PIN, LOW);
         digitalWriteFast(D14_PIN, LOW);
         digitalWriteFast(D15_PIN, LOW);
-    // */     
-      delayNanoseconds(50);   // to tune
-      digitalWriteFast(DIR_PIN,LOW); // set dir to Output from 5V INTV
+        // */     
+        delayNanoseconds(20);   // to tune ok a 40 / 20
+        digitalWriteFast(DIR_PIN,LOW); // set dir to Output from 5V INTV
 
-      delayNanoseconds(50);   // to tune
+        delayNanoseconds(380);   // to tune ok a 360 / 380
 
    
-        if (parallelBus == 0x5008) {
+       /* if (parallelBus == 0x5008) {
           display.clearDisplay();
           display.setCursor(0, 1);
           display.print(parallelBus,HEX);
@@ -270,8 +271,8 @@ void loop()
           display.print(dataOut,HEX);
           display.display();
        //   while(1);
-        }
-      //*/ 
+       }
+       */ 
            
         // See if we can wait with NOPs and then switch our bus direction back to
         // input here instead of waiting for a NACT.  That would free up the NACT
@@ -287,26 +288,35 @@ void loop()
     }
     else
     {
-      if (busState1==BUS_BAR)
+      if ((busState1==BUS_BAR)||(busState1==BUS_ADAR))
       {
         // -----------------------
         // BAR, ADAR
         // -----------------------
 
-        // We have to wait until the address is stable on the bus
+        
+        for (int i=0; i<16; i++) {
+            pinMode(D_PIN[i], INPUT);
+        } // SET DIR TO INPUT
 
-           
+
         // Prefetch data here because there won't be enough time to get it during DTB.
         // However, we can't take forever because of all the time we had to wait for
         // the address to appear on the bus.
-      digitalWriteFast(DIR_PIN,HIGH); // set dir to input from 5V INTV
-       //wait for lvc245 to stabilize
-      delayNanoseconds(50); 
-    
-      for (int i=0; i<16; i++) {pinMode(D_PIN[i], INPUT);} // SET DIR TO INPUT
 
-      
-       parallelBus=(digitalReadFast(D0_PIN)<<0 |
+       // We have to wait until the address is stable on the bus
+
+        digitalWriteFast(DIR_PIN,HIGH); // set dir to input from 5V INTV
+       //wait for lvc245 to stabilize
+        delayNanoseconds(640); 
+
+       /* display.clearDisplay();
+        display.setCursor(0, 1);
+        display.print(parallelBus,HEX);
+        display.display();  
+        */
+
+        parallelBus=(digitalReadFast(D0_PIN)<<0 |
                     digitalReadFast(D1_PIN)<<1 |
                     digitalReadFast(D2_PIN)<<2 |
                     digitalReadFast(D3_PIN)<<3 |
@@ -323,7 +333,7 @@ void loop()
                     digitalReadFast(D14_PIN)<<14 |
                     digitalReadFast(D15_PIN)<<15);
    
-        // */   
+         // */   
         
           romOffset=parallelBus;
          
@@ -336,36 +346,28 @@ void loop()
             digitalWriteFast(Status_PIN,LOW);
           }  
        
-       //delayNanoseconds(100);
-       // to stabilize system
-       /*   if (deviceAddress) {
-              display.clearDisplay();
-              display.setCursor(0, 1);
-              display.print(parallelBus,HEX);
-              display.display();
-        //     while (1);
-          }
-      */    
+         // delayNanoseconds(20); // 20 to 800
+         // to stabilize system
+         //  if (parallelBus==0x1000) {
+         //      display.clearDisplay();
+         //      display.setCursor(0, 1);
+         //      display.print(parallelBus,HEX);
+         //      display.display();
+         //     while (1);
+         //  }
+         // */    
       }
       else
       {
-        if (busState1==BUS_NACT)
-        {
+        
           // -----------------------
           // NACT, IAB, DW, INTAK
           // -----------------------
-        digitalWriteFast(DIR_PIN,HIGH); // set dir to input from 5V INTV
-  
-        for (int i=0; i<16; i++) {pinMode(D_PIN[i], INPUT);} // SET DIR TO INPUT
-          
-           counter++;
-        
-          //    display.clearDisplay();
-          //    display.setCursor(0, 1);
-          //    display.print(parallelBus,HEX);
-          //    display.display();
-         }
-        }
-      }
+         for (int i=0; i<16; i++) {
+            pinMode(D_PIN[i], INPUT);
+        } // SET DIR TO INPUT
+      } 
     }
+   } 
+    
   }
