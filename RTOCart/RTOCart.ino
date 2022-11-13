@@ -1,14 +1,26 @@
+/*
+//                       RTO-CART by Andrea Ottaviani 
+// Intellivision multicart based on Teensy 4.1 board -
+// v. 0.1 2022-11-11 : Initial version
+//
+// Thanks to John Dullea (dwarfaxe@yahoo.com) for his support and his ACC projects, from wich i get some bits of code
+//
+*/
+// include for Oled display
 #include <Wire.h>               // SCL pin 19, SDA pin 18 SCL2 25, SDA2 24
 #include <Adafruit_GFX.h>      
 #include <Adafruit_SSD1306.h>   
  // include the SD library:
+
 #include <SD.h>
+//#include <SdFat.h>
 #include <SPI.h>
-File romFile;
+
 // set up variables using the SD utility library functions:
-Sd2Card card;
-SdVolume volume;
-SdFile root;
+//Sd2Card card;
+//SdVolume volume;
+File root;
+File entry;
 Adafruit_SSD1306 display(128, 32, &Wire2, -1, 1000000);  // 1MHz I2C clock
 
 // here is one continuous block of 16 bits
@@ -44,26 +56,6 @@ int D_PIN[] ={19,18,14,15,40,41,17,16,22,23,20,21,38,39,26,27};
 #define Status_PIN   37 //GPIO2_19
 
 
-// Teensy pin usage masks
-
-#define D0_PIN_MASK     0b0000000000000001
-#define D1_PIN_MASK     0b0000000000000010
-#define D2_PIN_MASK     0b0000000000000100
-#define D3_PIN_MASK     0b0000000000001000
-#define D4_PIN_MASK     0b0000000000010000
-#define D5_PIN_MASK     0b0000000000100000
-#define D6_PIN_MASK     0b0000000001000000
-#define D7_PIN_MASK     0b0000000010000000
-#define D8_PIN_MASK     0b0000000100000000
-#define D9_PIN_MASK     0b0000001000000000
-#define D10_PIN_MASK    0b0000010000000000
-#define D11_PIN_MASK    0b0000100000000000
-#define D12_PIN_MASK    0b0001000000000000
-#define D13_PIN_MASK    0b0010000000000000
-#define D14_PIN_MASK    0b0100000000000000
-#define D15_PIN_MASK    0b1000000000000000
-
-
 // Inty bus values (BDIR+BC2+BC1)
 
 #define BUS_NACT  0
@@ -75,15 +67,151 @@ int D_PIN[] ={19,18,14,15,40,41,17,16,22,23,20,21,38,39,26,27};
 #define BUS_DWS   6
 #define BUS_INTAK 7
 
-unsigned char busLookup[8];
+
 long romLen;
 byte RBLo,RBHi;
 //EXTMEM unsigned int ROM[65535];
  unsigned int ROM[65536];
+
 // change this to match your SD shield or module;
 // Teensy 3.5 & 3.6 & 4.1 on-board: BUILTIN_SDCARD
-
 const int chipSelect = BUILTIN_SDCARD;
+
+uint32_t selectedfile_size;       // BIN file size
+char selFileName[36];
+
+
+char* SelectBinFile() // adapted from my SDLEP-TFT project  http://dcmoto.free.fr/   
+{
+  int i; 
+ 
+  char suf[10];                 // extension file 
+  char longfilename[36];        // long file name (trunked) 
+  
+  uint64_t file_size;        // tailles des fichiers affiches
+  char* file_name;  // premiers blocs des fichiers affiches
+  // Initialisations
+  selectedfile_size = 0;          // initialisation de la taille du fichier choisi
+  file_size = 0;
+  bool selected = false;
+  bool filefound = false;
+  int subfolder = 0;    // nexting subfolders counter
+
+      display.clearDisplay();
+      display.setTextSize(1);
+      display.setTextColor(1);
+      display.setCursor(0, 1);
+      display.print("Reading card..");
+      display.display();
+    
+    // Boucle de choix du fichier
+   root=SD.open("/");
+  
+  while (!selected)
+  {
+    while (!filefound) 
+    {
+      //read next file
+      entry=root.openNextFile();
+      if(!entry)
+      {
+        if (subfolder>0) {
+          strcpy(longfilename,"/..");
+        root.rewindDirectory();
+        entry=root.openNextFile();
+        filefound=true;
+        break; 
+        } else {
+        root.rewindDirectory();
+        entry=root.openNextFile();
+        break;
+        }
+      //entry.close();
+        Serial.println("Rewind");
+        continue;      
+      }
+        if(entry.isDirectory()) {   //handling subdirectory
+          file_name=entry.name();
+          strcpy(longfilename,file_name);
+          if (strcmp(file_name,"System Volume Information")==0) {
+           continue;
+         } else {
+           filefound=true;
+           break; 
+         }
+        }
+
+      file_name=entry.name();
+      strcpy(longfilename,file_name);
+     
+      file_size = entry.size();
+      for(i=0; i<35; i++)
+        if (longfilename[i]=='.')
+          break;  //point trouve
+      
+      if(i==35)
+        continue; //dot not found, get next file
+   
+      //test du suffixe
+      suf[0]=longfilename[i+1];
+      suf[1]=longfilename[i+2];
+      suf[2]=longfilename[i+3];
+      suf[3]=0;
+      
+      if(strcmp(suf,"bin")!=0  && strcmp(suf,"BIN")!=0 )
+        continue; //not BIN file
+      
+      filefound=true;
+    }
+      // .bin found
+      display.clearDisplay();
+      display.setTextSize(1);
+      display.setTextColor(1);
+      display.setCursor(0, 1);
+      display.print(longfilename);
+      display.display();
+    filefound=false;
+    //check user button and time
+    while (1)
+    {
+      //Next button
+      if (digitalRead(BT1_PIN)) {
+          digitalWriteFast(Status_PIN,HIGH);
+          delay(400);
+          digitalWriteFast(Status_PIN,LOW);
+          break; // readnext file
+      }
+
+      //SELECT Button
+      if (digitalRead(BT2_PIN)) {
+          Serial.println(longfilename);
+          digitalWriteFast(Status_PIN,HIGH);
+          delay(400);
+          digitalWriteFast(Status_PIN,LOW);
+          if (entry.isDirectory()) {
+            root=SD.open(longfilename);
+            subfolder++;
+            Serial.println("dir down");
+            break;
+          } else 
+          if (strcmp(longfilename,"/..")==0) {
+            root=SD.open("/..");
+            subfolder--;
+            Serial.println("dir up");
+            break;
+          } else {
+          strcpy(file_name,longfilename);
+          selected=true;
+          break; // readnext file
+          }
+        }
+      } 
+    } //fin de la boucle de choix du fichier (on en sort si le fichier a ete choisi)
+  //root.close();  //fermeture du repertoire de la carte SD
+  Serial.print("Returning:");
+  Serial.print(file_name);
+  return file_name;
+}
 
 
 void setup() {
@@ -138,22 +266,31 @@ int fileOffset;
 
 //  IOMUXC_GPR_GPR26 &=0xffff0000;
 
- // Serial.begin(115200);
+  Serial.begin(115200);
 
- //while(!Serial);
+  //while(!Serial);
+  Serial.println("Serial started");
 
   for (long i=0; i<65536; i++) {
     ROM[i]=0xfff;
   }
 
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  while (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C));
   delay(100);
   display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(1);
   display.setCursor(0, 1);
-  display.print("Reading: Last.bin");
+  display.print("Oled intitialized");
   display.display();
+
+  while (!SD.begin(chipSelect)) 
+  {
+    Serial.println("initialization failed!");
+    display.clearDisplay();
+    display.setCursor(0, 1);
+    display.print("Insert SDCard");
+    display.display();
+    delay(2000);
+  }
 
   for (int i=0; i<16; i++) {pinMode(D_PIN[i], OUTPUT);} 
 
@@ -162,44 +299,55 @@ int fileOffset;
   pinMode(BDIR_PIN, INPUT);
   pinMode(BC1_PIN, INPUT);
   pinMode(BC2_PIN, INPUT);
+  pinMode(BT1_PIN,INPUT_PULLDOWN);
+  pinMode(BT2_PIN,INPUT_PULLDOWN);
+  
   digitalWriteFast(Status_PIN,HIGH);
 
 
-  if (!SD.begin(chipSelect)) {
-    //Serial.println("initialization failed!");
-    display.clearDisplay();
-    display.setCursor(0, 1);
-    display.print("SD init fail!");
-    display.display();
-    return;
-  }
-  romFile = SD.open("last.bin");
-  if (romFile) {
+
+
+  char* sfn=SelectBinFile();
+  Serial.print("Selected: ");
+  Serial.println(sfn);
+
+  strcpy(selFileName,sfn);
+  Serial.println(selFileName);
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(1);
+  display.setCursor(0, 1);
+  display.print("Reading:");
+  display.setCursor(0,16);
+  display.print(selFileName);
+  display.display();
+
+  if (entry) {
     // read from the file until there's nothing else in it:
     romLen=0;
-    while (romFile.available()) {
-      RBHi=romFile.read();
-      RBLo=romFile.read();
+    while (entry.available()) {
+      RBHi=entry.read();
+      RBLo=entry.read();
       fileOffset=romLen + 0x5000;
       ROM[fileOffset]=RBLo | (RBHi << 8);
-    //  Serial.print(fileOffset,HEX);
-    //  Serial.print("-");
-    //  Serial.println(ROM[fileOffset],HEX);
+      Serial.print(fileOffset,HEX);
+      Serial.print("-");
+      Serial.println(ROM[fileOffset],HEX);
       romLen++;
     }
     // close the file:
-    romFile.close();
+    entry.close();
   } else {
     // if the file didn't open, print an error:
     display.clearDisplay();
     display.setCursor(0, 1);
-    display.print("Error opening file");
+    display.print("Error opening file:");
+    display.setCursor(0,16);
+    display.print(selFileName);
     display.display();
     return; 
      }
-
 }
-
 
 FASTRUN void loop()
 {
@@ -208,7 +356,12 @@ FASTRUN void loop()
   unsigned int romOffset=0;
   unsigned int parallelBus,dataOut;
   bool deviceAddress = false;  
-  
+    display.clearDisplay();
+    display.setCursor(0, 1);
+    display.print("Emulating ROM:");
+    display.setCursor(0,16);
+    display.print(selFileName);
+    display.display();
   // Initialize the bus state variables
 
   lastBusState = BUS_NACT;
@@ -219,18 +372,8 @@ FASTRUN void loop()
         
     digitalWriteFast(DIR_PIN,HIGH); // set dir to input from 5V INTV
     //wait for lvc245 to stabilize
-  delayNanoseconds(600);
   // reading data
     parallelBus = (GPIO6_PSR >> 16);     
-    //parallelBus=(digitalReadFast(D0_PIN) | digitalReadFast(D1_PIN)<<1 | digitalReadFast(D2_PIN)<<2 | digitalReadFast(D3_PIN)<<3 |
-    //             digitalReadFast(D4_PIN)<<4 | digitalReadFast(D5_PIN)<<5 | digitalReadFast(D6_PIN)<<6 |
-    //             digitalReadFast(D7_PIN)<<7 | digitalReadFast(D8_PIN)<<8 | digitalReadFast(D9_PIN)<<9 |
-    //             digitalReadFast(D10_PIN)<<10 | digitalReadFast(D11_PIN)<<11 | digitalReadFast(D12_PIN)<<12 |
-    //             digitalReadFast(D13_PIN)<<13| digitalReadFast(D14_PIN)<<14 | digitalReadFast(D15_PIN)<<15);
-    display.clearDisplay();
-    display.setCursor(0, 1);
-    display.print(parallelBus,HEX);
-    display.display();
     
    // Main loop   
   digitalWriteFast(Status_PIN,LOW);
@@ -274,7 +417,7 @@ FASTRUN void loop()
         //delayNanoseconds(32);   // to tune ok a 32
         digitalWriteFast(DIR_PIN,LOW); // set dir to Output from 5V INTV
         
-        delayNanoseconds(780);   // to tune ok a 360 / 380
+        delayNanoseconds(482);   // to tune ok a 360 / 380
      
         // See if we can wait with NOPs and then switch our bus direction back to
         // input here instead of waiting for a NACT.  That would free up the NACT
@@ -305,31 +448,34 @@ FASTRUN void loop()
 
         digitalWriteFast(DIR_PIN,HIGH); // set dir to input from 5V INTV
        //wait for lvc245 to stabilize
-        delayNanoseconds(780); // 64 last, 70 buono last funziona con display on
+        delayNanoseconds(600); // 64 last, 70 buono last funziona con display on
        
        GPIO6_GDIR &= 0x0000FFFF; // to set pins to inputs (bit16-31)
        parallelBus = (GPIO6_PSR >> 16);     
-    
-         
+
+       
+      }
+      else
+      {
+          // -----------------------
+          // NACT, IAB, DW, INTAK
+          // -----------------------
+        GPIO6_GDIR &= 0x0000FFFF; // to set pins to inputs (bit16-31)
+        digitalWriteFast(DIR_PIN,HIGH); // input to bus
+        // reconnect to bus
+          
+          // Load data for DTB here to save time
           romOffset=parallelBus;
          
           dataOut=ROM[romOffset];
           if (dataOut != 0xfff) {
           deviceAddress = true;
-          //digitalWriteFast(Status_PIN,HIGH);
+          digitalWriteFast(Status_PIN,HIGH);
           } else {
             deviceAddress = false;
-            //digitalWriteFast(Status_PIN,LOW);
+            digitalWriteFast(Status_PIN,LOW);
           }  
-       
-      }
-      else
-      {
-        
-          // -----------------------
-          // NACT, IAB, DW, INTAK
-          // -----------------------
-        GPIO6_GDIR &= 0x0000FFFF; // to set pins to inputs (bit16-31)
+
        } // SET DIR TO INPUT
       } 
     }
