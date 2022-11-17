@@ -96,6 +96,7 @@ uint32_t selectedfile_size;       // BIN file size
 char longfilename[46];        // long file name (trunked) 
 char mapfilename[46];          // map cfg file name
 int lenfilename; 
+char path[50];
 
 void SelectBinFile() // adapted from my SDLEP-TFT project  http://dcmoto.free.fr/   
 {
@@ -121,6 +122,7 @@ void SelectBinFile() // adapted from my SDLEP-TFT project  http://dcmoto.free.fr
       delay(1000);
     
     // Boucle de choix du fichier
+   path[0]=0;
    root=SD.open("/");
   
   while (!selected)
@@ -155,11 +157,10 @@ void SelectBinFile() // adapted from my SDLEP-TFT project  http://dcmoto.free.fr
            break; 
          }
         }
-       
+
+      for(i=0; i<46; i++) longfilename[i]=0; 
       strcpy(longfilename,entry.name());
       
-      Serial.println(longfilename);
-
       dot=0;
       for(i=0; i<43; i++) {
         if (longfilename[i]=='.') {
@@ -168,10 +169,8 @@ void SelectBinFile() // adapted from my SDLEP-TFT project  http://dcmoto.free.fr
       }    
       if(dot==0) 
       {
-        Serial.println(dot);
         continue; //dot not found, get next file
       }
-      Serial.print("dot:"); Serial.println(dot);
       suf[0]=0;
       //test du suffixe
       suf[0]=longfilename[dot+1];
@@ -179,11 +178,9 @@ void SelectBinFile() // adapted from my SDLEP-TFT project  http://dcmoto.free.fr
       suf[2]=longfilename[dot+3];
       suf[3]=0;
     
-      Serial.println(suf);
-
+      
       if(strcmp(suf,"bin")!=0  && strcmp(suf,"BIN")!=0 )
         continue; //not BIN file
-      
       filefound=true;
     }
       // .bin found
@@ -209,7 +206,7 @@ void SelectBinFile() // adapted from my SDLEP-TFT project  http://dcmoto.free.fr
     while (1)
     {
       //Next button
-      if (digitalRead(BT1_PIN)) {
+      if (digitalRead(BT2_PIN)) {
           digitalWriteFast(Status_PIN,HIGH);
           delay(400);
           digitalWriteFast(Status_PIN,LOW);
@@ -217,17 +214,19 @@ void SelectBinFile() // adapted from my SDLEP-TFT project  http://dcmoto.free.fr
       }
 
       //SELECT Button
-      if (digitalRead(BT2_PIN)) {
+      if (digitalRead(BT1_PIN)) {
           digitalWriteFast(Status_PIN,HIGH);
           delay(400);
           digitalWriteFast(Status_PIN,LOW);
           if (entry.isDirectory()) {
             root=SD.open(longfilename);
+            strcat(path,longfilename);
             subfolder++;
             break;
           } else 
           if (strcmp(longfilename,"..")==0) {
             root=SD.open("/");
+            for(i=0;i<50;i++) path[i]=0;
             subfolder--;
             break;
           } else {
@@ -350,19 +349,27 @@ long maprom[5];
   }
   
   SelectBinFile();
-  for(int i=45; i>0; i--) {
+  
+  for(int i=0; i<45; i++) {
         if (longfilename[i]=='.') {
           lenfilename= i;  //dot found
         }
   }
-  memcpy(mapfilename,longfilename,lenfilename);
-  strcat(mapfilename,".cfg");
-  Serial.print("Try with:");
-  Serial.print(mapfilename);
-  Serial.println("<--");
   
-  mapfile=SD.open(mapfilename);
+  memcpy(mapfilename,longfilename,lenfilename);
+  Serial.print("mapname:");
+  Serial.println(mapfilename);
+  strcat(mapfilename,".cfg");
+  mapfile=SD.open(path);
+  if (!mapfile) Serial.println("path open error");
+
+  strcat(path,"/");
+  strcat(path,mapfilename);
+  Serial.println(path);
+  mapfile=SD.open(path);
+  //  mapfile=SD.open(mapfilename);
   if (!mapfile) {
+    mapfile.openNextFile();
     mapfile=SD.open("0.cfg");
     }
   if (!mapfile) {
@@ -480,7 +487,7 @@ FASTRUN void loop()
   unsigned char busBit;
   bool deviceAddress = false; 
   unsigned int delRD=520;
-  unsigned int delWR=580;
+  unsigned int delWR=550;
   
   display.clearDisplay();
   display.setCursor(0, 1);
@@ -529,7 +536,6 @@ FASTRUN void loop()
  //   if ((lastBusState2 & BUS_STATE_MASK) != (lastBusState & BUS_STATE_MASK)) {
  //     display.clearDisplay();
  //     display.setCursor(0, 1);
- //     display.print("Cazzo:");
  //     display.setCursor(0,16);
  //     display.print(lastBusState2,BIN);
  //     display.display();      
@@ -664,23 +670,23 @@ FASTRUN void loop()
       
          if (digitalReadFast(BT1_PIN)) 
          {
-          delRD--;
+          delWR--;
           display.clearDisplay();
           display.setCursor(0, 1);
-          display.print("delBD:");
+          display.print("delWR:");
           display.setCursor(0, 16);
-          display.print(delRD);
+          display.print(delWR);
           display.display();
           delay(100);
          }    
          if (digitalReadFast(BT2_PIN)) 
          {
-          delRD++;
+          delWR++;
           display.clearDisplay();
           display.setCursor(0, 1);
-          display.print("delRD:");
+          display.print("delWR:");
           display.setCursor(0, 16);
-          display.print(delRD);
+          display.print(delWR);
           display.display();
           delay(100);
          }    
