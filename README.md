@@ -5,5 +5,5 @@ File navigation is done with the two button ("next" and "select"). The ".." choo
 
 
 ![ScreenShot](https://raw.githubusercontent.com/aotta/RTO-Cart/main/rto_chess.jpg)
-![ScreenShot](https://raw.githubusercontent.com/aotta/RTO-Cart/main/RTO1.png)
-![ScreenShot](https://raw.githubusercontent.com/aotta/RTO-Cart/main/RTO3.png)
+![ScreenShot](https://raw.githubusercontent.com/aotta/RTO-Cart/main/cart2.png)
+![ScreenShot](https://raw.githubusercontent.com/aotta/RTO-Cart/main/rto_pcb.jpg)
