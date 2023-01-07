@@ -89,25 +89,25 @@ unsigned char busLookup[8];
 
 
 char RBLo,RBHi;
-//EXTMEM unsigned int ROM[65536];
-#define BINLENGTH  80000L
+#define BINLENGTH  224000L
 #define RAMSIZE  8192
-unsigned int ROM[BINLENGTH];
-unsigned int RAM[RAMSIZE];
+//EXTMEM unsigned int ROM[BINLENGTH];
+uint16_t ROM[BINLENGTH] DMAMEM;
+uint16_t RAM[RAMSIZE] DMAMEM;
 
 
 unsigned int romLen;
 
 unsigned int ramfrom = 0;
 unsigned int ramto =   0;
-unsigned int mapfrom[60];
-unsigned int mapto[60];
-unsigned int maprom[60];
-unsigned int addrto[60];
+unsigned int mapfrom[80];
+unsigned int mapto[80];
+unsigned int maprom[80];
+unsigned int addrto[80];
 unsigned int RAMused = 0;
 
-unsigned int tipo[60];  // 0-rom / 1-page / 2-ram
-unsigned int page[60];  // page number
+unsigned int tipo[80];  // 0-rom / 1-page / 2-ram
+unsigned int page[80];  // page number
 int slot;
 
 // change this to match your SD shield or module;
@@ -324,8 +324,8 @@ void setup() {
 //  IOMUXC_GPR_GPR26 &=0xffff0000; not needed in teensy 4.1, it's default
 
 String riga;
-char tmphex[] {0,0,0,0,0};
-
+char tmphex[] {0,0,0,0,0,0};
+int linepos;
  //Serial.begin(115200);
   
   pinMode(Status_PIN, OUTPUT);
@@ -427,22 +427,35 @@ char tmphex[] {0,0,0,0,0};
         RAMused=1;
         slot++;
         } else {
-        tmp=riga.substring(1,5);
-        tmp.toCharArray(tmphex,5);
+        linepos=riga.indexOf("-");
+        if (linepos>=0) {
+        tmp=riga.substring(1,linepos-1);
+        tmp.toCharArray(tmphex,6);
         mapfrom[slot]=strtoul(tmphex,NULL,16);
-        
-        tmp=riga.substring(9,13);
-        tmp.toCharArray(tmphex,5);
+        tmp=riga.substring(linepos+3,linepos+9);
+        tmp.toCharArray(tmphex,6);
         mapto[slot]=strtoul(tmphex,NULL,16);
-        tmp=riga.substring(17,21);
-        tmp.toCharArray(tmphex,5);
+        if (linepos==6) {
+          tmp=riga.substring(linepos+11,linepos+15);
+        } else {
+          tmp=riga.substring(linepos+12,linepos+17);
+        }
+        tmp.toCharArray(tmphex,6);
         maprom[slot]=strtoul(tmphex,NULL,16);
-        tmp=riga.substring(22,26);
-        tmp.toCharArray(tmphex,5);
+        if (linepos==6) {
+           tmp=riga.substring(22,26);
+        } else {
+           tmp=riga.substring(24,28);
+        }  
+        tmp.toCharArray(tmphex,6);
         addrto[slot]=maprom[slot]+(mapto[slot]-mapfrom[slot]);
         if (!(strcmp(tmphex,"PAGE"))) {
           tipo[slot]=1;
-          tmp=riga.substring(27,28);
+          if (linepos==6) {
+            tmp=riga.substring(27,28);
+          } else {
+            tmp=riga.substring(29,31);
+          }   
           tmp.toCharArray(tmphex,2);
           page[slot]=strtoul(tmphex,NULL,16);
           } else {
@@ -457,6 +470,7 @@ char tmphex[] {0,0,0,0,0};
         Serial.print(" tipo:");Serial.print(tipo[slot-1]);
         Serial.print(" page:");Serial.print(page[slot-1]);
         Serial.print(" addr-to:");Serial.println(addrto[slot-1],HEX);
+        }
      }
   }
      
@@ -472,7 +486,16 @@ char tmphex[] {0,0,0,0,0};
       //fileOffset=romLen - mapfrom[slot] + maprom[slot];
       ROM[romLen]=dataW;
       romLen++;
-      //if (romLen>mapto[slot]) slot++;
+         if (romLen>BINLENGTH) {
+          display.clearDisplay();
+          display.setCursor(0, 1);
+          display.print("File too big!");
+          display.setCursor(0,16);
+          display.print(longfilename);
+          display.display();
+          while(1);
+      }
+  
     }
     //verify
   //  slot=0;
@@ -491,8 +514,7 @@ char tmphex[] {0,0,0,0,0};
         while(1);
       } 
       romLen++;
-      //if (romLen>mapto[slot]) slot++;
-    } 
+     } 
     // close the file:
     entry.close();
   } else {
@@ -510,7 +532,8 @@ char tmphex[] {0,0,0,0,0};
 
 void yield () {} //Get rid of the hidden function that checks for serial input and such.
 
-FASTRUN void loop()
+//FASTRUN void loop()
+void loop()
 {
   unsigned int lastBusState, busState1;
   unsigned int parallelBus, dataOut;
@@ -520,7 +543,7 @@ FASTRUN void loop()
   unsigned int delWR=540;
   unsigned int delADAR=0;
   unsigned int curPage=0;
-  //unsigned int checkPage=0;
+  unsigned int checkPage=0;
   
   display.clearDisplay();
   display.setCursor(0, 1);
@@ -559,6 +582,7 @@ FASTRUN void loop()
   while (true)
   {
     // Wait for the bus state to change
+  
     do
     {
     } while (!((GPIO9_PSR ^ lastBusState) & BUS_STATE_MASK));
@@ -623,27 +647,38 @@ FASTRUN void loop()
         GPIO6_GDIR &= 0x0000FFFF; // to set pins to inputs (bit16-31)
         GPIO9_DR |= BUS_DIR_MASK;  // set bit 9 ->set dir to input (high)   
        // We have to wait until the address is stable on the bus
-        delayNanoseconds(delRD-delADAR-30); // waiting bus is stable
+        delayNanoseconds(delRD-delADAR); // waiting bus is stable
         
         parallelBus = GPIO6_PSR >> 16; 
        
        // Load data for DTB here to save time
-        dataOut=0xffff;
-   
+    
+        deviceAddress = false;
+         
         for (int i=0; i < slot+1; i++) {
-          if ((parallelBus >= maprom[i]) && (parallelBus<=addrto[i])) {
-            dataOut=ROM[(parallelBus - maprom[i+curPage]) + mapfrom[i+curPage]];
-            if (tipo[i]==2) {
-              dataOut=RAM[parallelBus - ramfrom];
-            }
-          
-          }
-        }
-        
-        if (dataOut != 0xffff) {
-          deviceAddress = true;
-        } else {
-          deviceAddress = false;
+            if ((parallelBus >= maprom[i]) && (parallelBus<=addrto[i])) {
+              if (tipo[i]==2) {
+                dataOut=RAM[parallelBus - ramfrom];
+                deviceAddress = true;
+                break;
+              }
+              if ((tipo[i]==1) && ((parallelBus & 0xfff)==0xfff)) {
+                checkPage=1;
+                deviceAddress = true;
+                break;
+              }
+              if ((page[i]==curPage) && (tipo[i]==1)) {
+                dataOut=ROM[(parallelBus - maprom[i]) + mapfrom[i]];
+                deviceAddress = true;
+                break;
+              }
+              if (tipo[i]==0) {
+                dataOut=ROM[(parallelBus - maprom[i]) + mapfrom[i]];
+                deviceAddress = true;
+                break;
+              }
+            } 
+           
         }
       }
       else
@@ -660,9 +695,13 @@ FASTRUN void loop()
             GPIO9_DR |= BUS_DIR_MASK;  // set bit 9 ->set dir to input (high)   
             unsigned int dataWrite = GPIO6_PSR >> 16;
             if (RAMused == 1) RAM[parallelBus-ramfrom]=dataWrite;
-      
-            }
+            if ((checkPage == 1) && (((dataWrite >> 4) & 0xff) == 0xA5)) {
+            //  if (checkPage == 1) {
+                curPage=dataWrite & 0xf;
+              checkPage=0;
+             }
           }
+        }
         else
         {
          // -----------------------
