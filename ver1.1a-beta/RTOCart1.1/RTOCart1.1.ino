@@ -107,6 +107,7 @@ int D_PIN[] ={19,18,14,15,40,41,17,16,22,23,20,21,38,39,26,27};
 #define BT3_PIN  34 //GPIO2_29
 #define Status_PIN   37 //GPIO2_19
 #define RST_PIN   7 //GPIO2_17
+#define MSYNC_PIN   8 //GPIO2_16
 
 // Inty bus values (BC2+BC1+BDIR)
 #define BUS_NACT  0b000  //0
@@ -280,7 +281,7 @@ void SelectBinFile() // adapted from my SDLEP-TFT project  http://dcmoto.free.fr
     while (1)
     {
       //Next button
-      if (digitalRead(BT2_PIN)) {
+      if (digitalRead(BT1_PIN)) {
           digitalWriteFast(Status_PIN,HIGH);
           delay(300);
           digitalWriteFast(Status_PIN,LOW);
@@ -301,7 +302,7 @@ void SelectBinFile() // adapted from my SDLEP-TFT project  http://dcmoto.free.fr
           break;
       }
       //SELECT Button
-      if (digitalRead(BT1_PIN)) {
+      if (digitalRead(BT2_PIN)) {
           digitalWriteFast(Status_PIN,HIGH);
           delay(300);
           digitalWriteFast(Status_PIN,LOW);
@@ -524,8 +525,9 @@ void loadROM() {
     display.setCursor(0,16);
     display.print("OK to confirm, Next or Prev to deny");
     display.display();
+    delay(500); // wait to clear buttons
     while(((digitalReadFast(BT1_PIN)==0) & (digitalReadFast(BT2_PIN)==0) & (digitalReadFast(BT3_PIN)==0))) {
-      if ((digitalReadFast(BT1_PIN)==1) | (digitalReadFast(BT2_PIN)==1)) hacks=0;
+      if ((digitalReadFast(BT1_PIN)==1) | (digitalReadFast(BT3_PIN)==1)) hacks=0;
     }
   } 
 }
@@ -590,6 +592,17 @@ void setup() {
   IOMUXC_SW_PAD_CTL_PAD_GPIO_EMC_05 = PAD;
   IOMUXC_SW_PAD_CTL_PAD_GPIO_EMC_06 = PAD;
 
+ // Initialize the bus state variables
+
+  busLookup[BUS_NACT]  = 4; // 100
+  busLookup[BUS_BAR]   = 1; // 001
+  busLookup[BUS_IAB]   = 4; // 100
+  busLookup[BUS_DWS]   = 2; // 010   // test without dws handling
+  busLookup[BUS_ADAR]  = 1; // 001
+  busLookup[BUS_DW]    = 4; // 100
+  busLookup[BUS_DTB]   = 0; // 000
+  busLookup[BUS_INTAK] = 4; // 100
+  
 //  IOMUXC_GPR_GPR26 &=0xffff0000; not needed in teensy 4.1, it's default
 
  //Serial.begin(115200);
@@ -600,9 +613,10 @@ void setup() {
   pinMode(BT3_PIN,INPUT_PULLDOWN);
   pinMode(DIR2_PIN,OUTPUT);
   pinMode(RST_PIN,OUTPUT);
-  
-  digitalWriteFast(RST_PIN,HIGH);
-  digitalWriteFast(DIR2_PIN,HIGH);
+  pinMode(MSYNC_PIN,INPUT_PULLDOWN);
+    
+  digitalWriteFast(RST_PIN,LOW);   //???????????
+  digitalWriteFast(DIR2_PIN,HIGH); // A->B, TEENSY to INTV BUS
   
   for (long i=0; i<BINLENGTH; i++) {
     ROM[i]=0;
@@ -684,20 +698,31 @@ void yield () {} //Get rid of the hidden function that checks for serial input a
 ////////////////////////////////////////////////////////////////////////////////////
 void resetCart() {
  
-  pinMode(RST_PIN,OUTPUT);
-  //display.clearDisplay();
-  //display.setCursor(0, 1);
-  //display.print("Reset");
-  //display.display();
-  digitalWriteFast(DIR2_PIN,HIGH);
-  digitalWriteFast(RST_PIN,LOW);
-  delayNanoseconds(55);  // quasi ok a 60
-  digitalWriteFast(RST_PIN,HIGH);
-  delayNanoseconds(40); // quasi ok a 40
-  digitalWriteFast(DIR2_PIN,LOW);
-  //pinMode(RST_PIN,INPUT);
-  //Serial.println("Reset");
+  digitalWriteFast(Status_PIN,HIGH);
+  Serial.println(digitalReadFast(MSYNC_PIN));
+
+  do {
+    digitalWriteFast(Status_PIN,digitalReadFast(MSYNC_PIN));
+    digitalWriteFast(RST_PIN,HIGH);
+    delay(6);
+    if (digitalReadFast(MSYNC_PIN)==0) break;
+    digitalWriteFast(RST_PIN,LOW);
+    delay(2);
+    if (digitalReadFast(MSYNC_PIN)==0) break;
+    
+  } while (digitalReadFast(MSYNC_PIN)==1);
+
+//  do {
+   digitalWriteFast(Status_PIN,digitalReadFast(MSYNC_PIN));
+   digitalWriteFast(RST_PIN,LOW); 
+ // } while (digitalReadFast(MSYNC_PIN)==0);
+  
  
+  Serial.println(digitalReadFast(MSYNC_PIN));
+  
+  digitalWriteFast(Status_PIN,LOW);
+   //pinMode(RST_PIN,INPUT);
+  //Serial.println("Reset");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -717,17 +742,6 @@ FASTRUN void HandleBUS()
   unsigned int checkPage=0;
   int exitBUS;
    
-  // Initialize the bus state variables
-
-  busLookup[BUS_NACT]  = 4; // 100
-  busLookup[BUS_BAR]   = 1; // 001
-  busLookup[BUS_IAB]   = 4; // 100
-  busLookup[BUS_DWS]   = 2; // 010   // test without dws handling
-  busLookup[BUS_ADAR]  = 1; // 001
-  busLookup[BUS_DW]    = 4; // 100
-  busLookup[BUS_DTB]   = 0; // 000
-  busLookup[BUS_INTAK] = 4; // 100
-
   busState1 = BUS_NACT;
   lastBusState = BUS_NACT;
   
@@ -743,8 +757,9 @@ FASTRUN void HandleBUS()
   parallelBus = (GPIO6_PSR >> 16);     
   
   // Main loop   
-  
+
   exitBUS=1;
+
   while (exitBUS)
   {
 
