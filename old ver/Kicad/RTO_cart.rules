@@ -1,0 +1,89 @@
+
+(rules PCB RTO_cart
+  (snap_angle 
+    fortyfive_degree
+  )
+  (autoroute_settings
+    (fanout off)
+    (autoroute on)
+    (postroute on)
+    (vias on)
+    (via_costs 50)
+    (plane_via_costs 5)
+    (start_ripup_costs 100)
+    (start_pass_no 6)
+    (layer_rule F.Cu
+      (active on)
+      (preferred_direction vertical)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 3.0)
+    )
+    (layer_rule B.Cu
+      (active on)
+      (preferred_direction horizontal)
+      (preferred_direction_trace_costs 1.0)
+      (against_preferred_direction_trace_costs 1.5)
+    )
+  )
+  (rule
+    (width 250.0)
+    (clear 200.0)
+    (clear 125.0 (type smd_to_turn_gap))
+    (clear 50.0 (type smd-smd))
+  )
+  (padstack "Via[0-1]_800:400_um"
+    (shape
+      (circle F.Cu 800.0 0.0 0.0)
+    )
+    (shape
+      (circle B.Cu 800.0 0.0 0.0)
+    )
+    (attach off)
+  )
+  (via 
+    "Via[0-1]_800:400_um" "Via[0-1]_800:400_um" default
+  )
+  (via 
+    "Via[0-1]_800:400_um-kicad_default" "Via[0-1]_800:400_um" "kicad_default"
+  )
+  (via_rule
+    default "Via[0-1]_800:400_um"
+  )
+  (via_rule
+    "kicad_default" "Via[0-1]_800:400_um-kicad_default"
+  )
+  (class default
+    +5V GND "unconnected-(J1-Pad2)" "unconnected-(J1-Pad3)" "unconnected-(J1-Pad4)" d7' "unconnected-(J1-Pad6)" d8'
+    "unconnected-(J1-Pad8)" d6' "unconnected-(J1-Pad10)" d9' d5' "unconnected-(J1-Pad14)" d10' "unconnected-(J1-Pad16)"
+    d4' "unconnected-(J1-Pad18)" d11' d3' d12' d13' d2' d14'
+    "unconnected-(J1-Pad30)" d1' "Net-(J1-Pad32)" d0' "Net-(J1-Pad34)" d15' "Net-(J1-Pad36)" bdir'
+    bc2' bc1' DIR D7 D6 D5 D4 D3
+    D2 D1 D0 D15 "unconnected-(U3-Pad9)" D14 "unconnected-(U3-Pad11)" "unconnected-(U3-Pad7)"
+    D13 D12 D11 D10 D9 D8 BDIR BC1
+    BC2 +3.3V "unconnected-(U3-Pad5)" "unconnected-(U3-Pad6)" "unconnected-(U3-Pad8)" "unconnected-(U3-Pad12)" "unconnected-(U3-Pad13)" "unconnected-(U3-Pad14)"
+    "unconnected-(U3-Pad15)" "unconnected-(U4-Pad2)" "unconnected-(U4-Pad3)" SDA "Net-(R4-Pad1)" SCL "Net-(R3-Pad1)" "unconnected-(U4-Pad8)"
+    "unconnected-(U4-Pad9)" "unconnected-(U4-Pad10)" "unconnected-(U4-Pad11)" "unconnected-(U4-Pad35)" "unconnected-(U4-Pad12)" "unconnected-(U4-Pad13)" "unconnected-(U4-Pad14)" "unconnected-(U4-Pad20)"
+    "unconnected-(U4-Pad21)" "unconnected-(U4-Pad22)" "unconnected-(U4-Pad23)" "unconnected-(U4-Pad24)" "unconnected-(U4-Pad25)" "unconnected-(U4-Pad26)" "unconnected-(U4-Pad49)" "unconnected-(U4-Pad50)"
+    "unconnected-(U4-Pad51)" "unconnected-(U4-Pad52)" "unconnected-(U4-Pad53)" "unconnected-(U4-Pad54)" "unconnected-(U4-Pad55)" "unconnected-(U4-Pad56)" "unconnected-(U4-Pad57)" "unconnected-(U4-Pad58)"
+    "unconnected-(U4-Pad59)" "unconnected-(U4-Pad60)" "unconnected-(U4-Pad61)" "unconnected-(U4-Pad62)" "unconnected-(U4-Pad63)" "unconnected-(U4-Pad64)" "unconnected-(U4-Pad65)" "unconnected-(U4-Pad66)"
+    "unconnected-(U4-Pad67)" "Net-(D1-Pad2)" "Net-(D2-Pad2)" Status BT1 BT2
+    (clearance_class default)
+    (via_rule default)
+    (rule
+      (width 250.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+  (class "kicad_default"
+    (clearance_class "kicad_default")
+    (via_rule "kicad_default")
+    (rule
+      (width 250.0)
+    )
+    (circuit 
+      (use_layer F.Cu B.Cu)
+    )
+  )
+)
