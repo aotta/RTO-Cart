@@ -9,6 +9,9 @@ You probably don't need mounting the resistor near the edge for reset the consol
 More infor on:
 https://forums.atariage.com/topic/346024-intellivision-rto-multicart-new-multicart/
 
+Fixed version for SECAM Intellivision (thanks to zx81zx81):
+https://github.com/zx81zx81/RTO-Cart-secam
+
 ![ScreenShot](https://raw.githubusercontent.com/aotta/RTO-Cart/main/rto_chess.jpg)
 ![ScreenShot](https://raw.githubusercontent.com/aotta/RTO-Cart/main/RTO_Cart_OK.jpg)
 ![ScreenShot](https://raw.githubusercontent.com/aotta/RTO-Cart/main/RTO1.1_1.jpg)
